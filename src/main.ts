@@ -4,6 +4,7 @@ import { GAME_CONFIG } from './config/gameConfig';
 import { GameScene } from './game/GameScene';
 import { TeachableMachineService } from './ai/TeachableMachineService';
 import { UIManager } from './ui/UIManager';
+import { DevCheat } from './cheat/DevCheat';
 
 // Main Application Bootstrapper
 class App {
@@ -107,24 +108,32 @@ class App {
 
     this.ui.onTutorialFinished = () => {
       this.aiService.setGameplayActive(true);
-      this.ui.startCountdown(() => {
-        this.currentHp = GAME_CONFIG.MAX_HP;
-        this.currentScore = 0;
-        this.currentTimeSec = 0;
-        this.ui.updateHUD(this.currentHp, GAME_CONFIG.MAX_HP, 0, 0);
+      this.currentHp = GAME_CONFIG.MAX_HP;
+      this.currentScore = 0;
+      this.currentTimeSec = 0;
+      this.ui.updateHUD(this.currentHp, GAME_CONFIG.MAX_HP, 0, 0);
+      if (DevCheat.getInstance().getOptions().skipCountdown) {
         this.gameScene.startCountdownAndPlay();
-      });
+      } else {
+        this.ui.startCountdown(() => {
+          this.gameScene.startCountdownAndPlay();
+        });
+      }
     };
 
     this.ui.onPlayAgainClicked = () => {
       this.aiService.setGameplayActive(true);
-      this.ui.startCountdown(() => {
-        this.currentHp = GAME_CONFIG.MAX_HP;
-        this.currentScore = 0;
-        this.currentTimeSec = 0;
-        this.ui.updateHUD(this.currentHp, GAME_CONFIG.MAX_HP, 0, 0);
+      this.currentHp = GAME_CONFIG.MAX_HP;
+      this.currentScore = 0;
+      this.currentTimeSec = 0;
+      this.ui.updateHUD(this.currentHp, GAME_CONFIG.MAX_HP, 0, 0);
+      if (DevCheat.getInstance().getOptions().skipCountdown) {
         this.gameScene.startCountdownAndPlay();
-      });
+      } else {
+        this.ui.startCountdown(() => {
+          this.gameScene.startCountdownAndPlay();
+        });
+      }
     };
 
     this.ui.onMenuClicked = () => {
@@ -135,6 +144,14 @@ class App {
     this.ui.onManualLaneSelected = (lane) => {
       this.gameScene.setPlayerLane(lane);
       this.aiService.triggerManualLane(lane);
+    };
+
+    this.ui.onCheatInstantWin = () => {
+      this.gameScene.cheatInstantWin();
+    };
+
+    this.ui.onCheatAddScore = (amount) => {
+      this.gameScene.addCheatScore(amount);
     };
 
     // Proactively initialize webcam in background so preview starts right away if permissions exist

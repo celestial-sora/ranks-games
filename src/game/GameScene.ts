@@ -2,17 +2,18 @@ import Phaser from 'phaser';
 import { GAME_CONFIG } from '../config/gameConfig';
 import { LaneManager } from './LaneManager';
 import { Player } from './Player';
-import { ObstacleSpawner } from './ObstacleSpawner';
-import { Obstacle } from './Obstacle';
+import { CollectibleSpawner } from './CollectibleSpawner';
+import { Collectible } from './Collectible';
 import { SoundManager } from '../audio/SoundManager';
+import { DevCheat } from '../cheat/DevCheat';
 
 export type GameState = 'START' | 'COUNTDOWN' | 'PLAYING' | 'GAME_OVER' | 'VICTORY';
 
 export class GameScene extends Phaser.Scene {
   private laneManager!: LaneManager;
   private player!: Player;
-  private obstacleSpawner!: ObstacleSpawner;
-  private obstaclesGroup!: Phaser.Physics.Arcade.Group;
+  private collectibleSpawner!: CollectibleSpawner;
+  private collectiblesGroup!: Phaser.Physics.Arcade.Group;
 
   private gameState: GameState = 'START';
   private survivalTimeSec: number = 0;
@@ -51,14 +52,15 @@ export class GameScene extends Phaser.Scene {
     this.laneManager = new LaneManager(this);
     this.laneManager.create();
 
-    // Physics Group for Obstacles
-    this.obstaclesGroup = this.physics.add.group();
+    // Physics Group for Collectibles
+    this.collectiblesGroup = this.physics.add.group();
 
-    // Obstacle Spawner
-    this.obstacleSpawner = new ObstacleSpawner(this, this.laneManager, this.obstaclesGroup);
-    this.obstacleSpawner.onObstacleDodged = () => {
+    // Collectible Spawner
+    this.collectibleSpawner = new CollectibleSpawner(this, this.laneManager, this.collectiblesGroup);
+    this.collectibleSpawner.onCollected = (value) => {
       if (this.gameState === 'PLAYING') {
-        this.addScore(GAME_CONFIG.SCORE_DODGE_BONUS);
+        this.addScore(value);
+        SoundManager.getInstance().playCoin();
       }
     };
 
@@ -79,7 +81,6 @@ export class GameScene extends Phaser.Scene {
 
     this.player.onHit = () => {
       this.cameras.main.shake(180, 0.012);
-      this.spawnHitParticles(this.player.x, this.player.y);
     };
 
     this.setupKeyboardControls();
@@ -123,11 +124,26 @@ export class GameScene extends Phaser.Scene {
   public startCountdownAndPlay() {
     this.resetGame();
     this.gameState = 'PLAYING';
-    this.obstacleSpawner.start();
+    this.collectibleSpawner.start();
 
     if (this.onStateChanged) {
       this.onStateChanged('PLAYING');
     }
+  }
+
+  public isPlaying(): boolean {
+    return this.gameState === 'PLAYING';
+  }
+
+  public addCheatScore(amount: number) {
+    this.addScore(amount);
+  }
+
+  public cheatInstantWin() {
+    if (!this.isPlaying()) return;
+    this.survivalTimeSec = GAME_CONFIG.GAME_DURATION_SEC;
+    this.onTimeChanged?.(Math.floor(this.survivalTimeSec));
+    this.triggerVictory();
   }
 
   public resetGame() {
@@ -139,7 +155,7 @@ export class GameScene extends Phaser.Scene {
     const initialX = this.laneManager.getLaneCenter(initialLane);
     this.player.reset(initialX);
     this.laneManager.setActiveLane(initialLane);
-    this.obstacleSpawner.clearAll();
+    this.collectibleSpawner.clearAll();
 
     if (this.onScoreChanged) this.onScoreChanged(this.score);
     if (this.onTimeChanged) this.onTimeChanged(this.survivalTimeSec);
@@ -147,7 +163,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private addScore(amount: number) {
-    this.score += amount;
+    const multiplier = DevCheat.getInstance().getScoreMultiplier();
+    this.score += amount * multiplier;
     if (this.onScoreChanged) {
       this.onScoreChanged(this.score);
     }
@@ -155,7 +172,7 @@ export class GameScene extends Phaser.Scene {
 
   private triggerGameOver() {
     this.gameState = 'GAME_OVER';
-    this.obstacleSpawner.stop();
+    this.collectibleSpawner.stop();
     SoundManager.getInstance().playGameOver();
 
     if (this.onStateChanged) {
@@ -168,7 +185,7 @@ export class GameScene extends Phaser.Scene {
 
   private triggerVictory() {
     this.gameState = 'VICTORY';
-    this.obstacleSpawner.stop();
+    this.collectibleSpawner.stop();
     SoundManager.getInstance().playVictory();
 
     if (this.onStateChanged) {
@@ -179,18 +196,20 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private spawnHitParticles(x: number, y: number) {
+  private spawnCollectParticles(x: number, y: number, value: number) {
+    const color = value >= 40 ? 0xe5a86a : value >= 20 ? 0xd97757 : 0x8fae8b;
     const emitter = this.add.particles(x, y, undefined as unknown as string, {
-      speed: { min: 60, max: 200 },
+      speed: { min: 40, max: 140 },
       angle: { min: 0, max: 360 },
-      scale: { start: 2.8, end: 0 },
+      scale: { start: 2.4, end: 0 },
       alpha: { start: 0.9, end: 0 },
-      lifespan: 400,
-      quantity: 16,
+      lifespan: 350,
+      quantity: 12,
+      tint: color,
       emitting: false
     });
-    emitter.explode(16);
-    this.time.delayedCall(450, () => emitter.destroy());
+    emitter.explode(12);
+    this.time.delayedCall(400, () => emitter.destroy());
   }
 
   public update(_time: number, delta: number) {
@@ -210,18 +229,19 @@ export class GameScene extends Phaser.Scene {
 
     if (this.gameState === 'PLAYING') {
       this.player.update(delta);
-      this.obstacleSpawner.update(delta, this.survivalTimeSec);
+      this.collectibleSpawner.update(delta, this.survivalTimeSec);
 
-      // Distance Collision Check
-      const obstacles = this.obstaclesGroup.getChildren() as Obstacle[];
-      for (let i = obstacles.length - 1; i >= 0; i--) {
-        const obs = obstacles[i];
-        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, obs.x, obs.y);
-        if (dist < 40) {
-          const damaged = this.player.takeDamage();
-          if (damaged) {
-            this.spawnHitParticles(obs.x, obs.y);
-            this.obstaclesGroup.remove(obs, true, true);
+      // Distance Collection Check
+      const items = this.collectiblesGroup.getChildren() as Collectible[];
+      for (let i = items.length - 1; i >= 0; i--) {
+        const item = items[i];
+        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, item.x, item.y);
+        if (dist < 44) {
+          const value = item.getValue();
+          this.collectiblesGroup.remove(item, true, true);
+          if (this.collectibleSpawner.onCollected) {
+            this.collectibleSpawner.onCollected(value);
+            this.spawnCollectParticles(item.x, item.y, value);
           }
         }
       }

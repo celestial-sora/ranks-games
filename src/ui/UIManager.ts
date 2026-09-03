@@ -2,6 +2,7 @@ import { LANES, GAME_CONFIG } from '../config/gameConfig';
 import { PredictionItem } from '../ai/TeachableMachineService';
 import { SoundManager } from '../audio/SoundManager';
 import { ICONS } from './icons';
+import { DevCheat, CheatOptions } from '../cheat/DevCheat';
 
 export class UIManager {
   private static instance: UIManager;
@@ -50,6 +51,11 @@ export class UIManager {
   public onPlayAgainClicked?: () => void;
   public onMenuClicked?: () => void;
   public onManualLaneSelected?: (lane: number) => void;
+  public onCheatInstantWin?: () => void;
+  public onCheatAddScore?: (amount: number) => void;
+
+  private cheatPanel!: HTMLElement;
+  private cheatStates: Record<string, HTMLElement> = {};
 
   private constructor() {
     this.bestScore = parseInt(localStorage.getItem('ranks_dodge_best_score') || '0', 10);
@@ -65,6 +71,10 @@ export class UIManager {
   public init(containerId: string) {
     this.appContainer = document.getElementById(containerId) || document.body;
     this.buildUI();
+
+    DevCheat.getInstance().onChange((opts) => {
+      this.syncCheatUI(opts);
+    });
   }
 
   public getWebcamContainer(): HTMLElement {
@@ -140,7 +150,7 @@ export class UIManager {
                   Claude Dodge
                 </h1>
                 <p class="text-[#b4b0a5] text-xs sm:text-sm mt-2 max-w-xs mx-auto leading-relaxed">
-                  Navigate through geometric streams using physical objects in front of your camera.
+                  Collect the glowing gems using physical objects in front of your camera.
                 </p>
               </div>
 
@@ -161,7 +171,7 @@ export class UIManager {
                 <button id="btn-start" class="w-full py-3.5 claude-btn-primary font-medium text-base rounded-full shadow-md">
                   Begin Journey
                 </button>
-                <p class="text-[#827e75] text-[11px] mt-2.5">Webcam required • 3-minute survival</p>
+                <p class="text-[#827e75] text-[11px] mt-2.5">Webcam required • 3-minute gem collecting</p>
               </div>
             </div>
 
@@ -183,8 +193,7 @@ export class UIManager {
             <div id="screen-tutorial" class="absolute inset-0 bg-[#1e1d1a]/95 backdrop-blur-md flex flex-col items-center justify-between p-8 z-20 hidden">
               <div class="text-center mt-2">
                 <h2 class="text-3xl font-serif-claude italic font-normal text-[#faf9f5]">How It Works</h2>
-                <p class="text-[#b4b0a5] text-xs mt-1">Present objects to your camera to guide the vessel</p>
-              </div>
+                <p class="text-[#b4b0a5] text-xs mt-1">Present objects to your camera to guide the vessel</p>              </div>
 
               <div class="w-full grid grid-cols-3 gap-3 max-w-md my-auto">
                 <div class="p-3.5 bg-[#262522] rounded-2xl border border-[#383632] flex flex-col items-center text-center">
@@ -213,7 +222,7 @@ export class UIManager {
               </div>
 
               <div class="w-full max-w-xs mb-2 text-center">
-                <div class="text-xs text-[#b4b0a5] mb-3 font-light">Survive for 3 minutes to complete the journey.</div>
+                <div class="text-xs text-[#b4b0a5] mb-3 font-light">Collect gems for 3 minutes to complete the journey.</div>
                 <button id="btn-tutorial-ready" class="w-full py-3.5 claude-btn-primary font-medium text-sm rounded-full shadow-md">
                   I'm Ready
                 </button>
@@ -226,7 +235,7 @@ export class UIManager {
                 ${ICONS.shieldAlert(42)}
               </div>
               <h2 class="text-4xl font-serif-claude italic font-normal text-[#faf9f5] mb-1">Journey Ended</h2>
-              <p class="text-[#b4b0a5] text-xs mb-6">Your shields were depleted</p>
+              <p class="text-[#b4b0a5] text-xs mb-6">Your journey was interrupted</p>
 
               <div class="w-full max-w-xs bg-[#262522] border border-[#383632] rounded-2xl p-4 mb-6 space-y-3">
                 <div class="flex justify-between items-center text-xs">
@@ -261,7 +270,7 @@ export class UIManager {
               <h2 class="text-4xl font-serif-claude italic font-normal text-[#d97757] mb-1">
                 Completed
               </h2>
-              <p class="text-[#8fae8b] text-xs font-medium mb-6">You successfully survived 3 minutes!</p>
+              <p class="text-[#8fae8b] text-xs font-medium mb-6">You collected for 3 minutes!</p>
 
               <div class="w-full max-w-xs bg-[#262522] border border-[#d97757]/40 rounded-2xl p-4 mb-6 space-y-3 shadow-lg shadow-[#d97757]/10">
                 <div class="flex justify-between items-center text-xs">
@@ -352,6 +361,43 @@ export class UIManager {
                   <span class="text-[10px] text-[#b4b0a5]">${l.name}</span>
                 </button>
               `).join('')}
+            </div>
+          </div>
+
+          <!-- Dev Cheat Panel -->
+          <div class="cheat-panel-wrapper claude-card rounded-2xl p-3.5 shadow-lg border-[#593026]/60">
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-[11px] font-medium text-[#e58a70] uppercase tracking-wider flex items-center space-x-1.5">
+                ${ICONS.sparkle(12)}
+                <span>Dev Cheats</span>
+              </div>
+              <span class="text-[10px] text-[#827e75] font-mono-claude">Press "~" to toggle</span>
+            </div>
+            <div class="space-y-1.5">
+              <button data-cheat="godMode" class="cheat-btn w-full flex items-center justify-between py-1.5 px-3 rounded-lg text-xs border border-[#383632] bg-[#262522] hover:bg-[#302e2a] transition">
+                <span>God Mode (no damage)</span>
+                <span class="cheat-state font-mono-claude text-[#827e75]">OFF</span>
+              </button>
+              <button data-cheat="skipCountdown" class="cheat-btn w-full flex items-center justify-between py-1.5 px-3 rounded-lg text-xs border border-[#383632] bg-[#262522] hover:bg-[#302e2a] transition">
+                <span>Skip Countdown</span>
+                <span class="cheat-state font-mono-claude text-[#827e75]">OFF</span>
+              </button>
+              <div class="flex items-center justify-between py-1 px-3 rounded-lg text-xs border border-[#383632] bg-[#262522]">
+                <span>Score Multiplier</span>
+                <div class="flex space-x-1">
+                  <button data-cheat="mult1" class="cheat-mult w-6 h-6 rounded-md bg-[#1e1d1a] border border-[#383632] hover:bg-[#302e2a] text-[#d97757] font-mono-claude text-[11px]">×1</button>
+                  <button data-cheat="mult10" class="cheat-mult w-6 h-6 rounded-md bg-[#1e1d1a] border border-[#383632] hover:bg-[#302e2a] text-[#d97757] font-mono-claude text-[11px]">×10</button>
+                  <button data-cheat="mult100" class="cheat-mult w-6 h-6 rounded-md bg-[#1e1d1a] border border-[#383632] hover:bg-[#302e2a] text-[#d97757] font-mono-claude text-[11px]">×100</button>
+                </div>
+              </div>
+              <button data-cheat="instantWin" class="cheat-btn w-full flex items-center justify-between py-1.5 px-3 rounded-lg text-xs border border-[#483326] bg-[#2b211e] hover:bg-[#332722] text-[#e58a70] transition">
+                <span>⚡ Instant Win</span>
+                <span class="cheat-state font-mono-claude">RUN</span>
+              </button>
+              <button data-cheat="addScore" class="cheat-btn w-full flex items-center justify-between py-1.5 px-3 rounded-lg text-xs border border-[#483326] bg-[#2b211e] hover:bg-[#332722] text-[#e58a70] transition">
+                <span>+10,000 Score</span>
+                <span class="cheat-state font-mono-claude">SPEND</span>
+              </button>
             </div>
           </div>
 
@@ -446,6 +492,58 @@ export class UIManager {
         }
       });
     });
+
+    // Dev Cheat controls
+    this.cheatPanel = this.appContainer.querySelector('.cheat-panel-wrapper') as HTMLElement;
+    this.cheatStates = {};
+
+    document.querySelectorAll('.cheat-btn[data-cheat]').forEach((btn) => {
+      const key = btn.getAttribute('data-cheat')!;
+      const stateEl = btn.querySelector('.cheat-state') as HTMLElement;
+      this.cheatStates[key] = stateEl;
+      btn.addEventListener('click', () => {
+        if (key === 'instantWin') {
+          if (this.onCheatInstantWin) this.onCheatInstantWin();
+        } else if (key === 'addScore') {
+          if (this.onCheatAddScore) this.onCheatAddScore(10000);
+        } else {
+          DevCheat.getInstance().toggle(key as keyof CheatOptions);
+        }
+      });
+    });
+
+    document.querySelectorAll('.cheat-mult[data-cheat]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const mult = parseInt(btn.getAttribute('data-cheat')!.replace('mult', ''), 10);
+        DevCheat.getInstance().set('scoreMultiplier', mult);
+      });
+    });
+
+    // Backtick key toggles cheat panel visibility
+    document.addEventListener('keydown', (e) => {
+      if (e.key === '`' || e.key === '~') {
+        e.preventDefault();
+        this.toggleCheatPanel();
+      }
+    });
+  }
+
+  private toggleCheatPanel() {
+    if (!this.cheatPanel) return;
+    this.cheatPanel.classList.toggle('hidden');
+  }
+
+  private syncCheatUI(opts: CheatOptions) {
+    const god = this.cheatStates['godMode'];
+    if (god) {
+      god.innerText = opts.godMode ? 'ON' : 'OFF';
+      god.style.color = opts.godMode ? '#8fae8b' : '#827e75';
+    }
+    const skip = this.cheatStates['skipCountdown'];
+    if (skip) {
+      skip.innerText = opts.skipCountdown ? 'ON' : 'OFF';
+      skip.style.color = opts.skipCountdown ? '#8fae8b' : '#827e75';
+    }
   }
 
   public showStartScreen() {

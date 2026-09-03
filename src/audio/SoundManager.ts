@@ -113,6 +113,37 @@ export class SoundManager {
   }
 
   /**
+   * Sparkling marimba-ish coin pickup
+   */
+  public playCoin() {
+    if (this.isMuted) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const notes = [880, 1318.5]; // A5 -> E6 quick ascension
+
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const startTime = now + i * 0.07;
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, startTime);
+
+      gain.gain.setValueAtTime(0.001, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.12, startTime + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.3);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(startTime);
+      osc.stop(startTime + 0.3);
+    });
+  }
+
+  /**
    * Warm acoustic wood thud / soft filtered impact on taking damage
    */
   public playHit() {
