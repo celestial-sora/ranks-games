@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #141311;
+    color: #faf9f5;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+
+  .font-serif-claude {
+    font-family: 'Newsreader', Georgia, serif;
+  }
+
+  .font-mono-claude {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+/* Claude.ai Aesthetics & Warm Palette */
+.claude-card {
+  background-color: #1e1d1a;
+  border: 1px solid #383632;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.claude-card-subtle {
+  background-color: #262522;
+  border: 1px solid #3a3834;
+}
+
+.claude-border {
+  border-color: #383632;
+}
+
+.claude-terracotta {
+  color: #d97757;
+}
+
+.claude-bg-terracotta {
+  background-color: #d97757;
+}
+
+.claude-btn-primary {
+  background: #d97757;
+  color: #faf9f5;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.claude-btn-primary:hover {
+  background: #c66849;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(217, 119, 87, 0.35);
+}
+
+.claude-btn-primary:active {
+  transform: translateY(0);
+}
+
+.claude-btn-secondary {
+  background: #2b2a26;
+  border: 1px solid #3e3c37;
+  color: #ece9df;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.claude-btn-secondary:hover {
+  background: #36342f;
+  border-color: #524f48;
+  color: #faf9f5;
+}
+
+.claude-glow-soft {
+  box-shadow: 0 0 30px -5px rgba(217, 119, 87, 0.2);
+}
+
+/* Subtle breathing animation */
+@keyframes claudePulse {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.6; }
+}
+
+.claude-pulse {
+  animation: claudePulse 3s infinite ease-in-out;
+}
